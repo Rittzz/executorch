@@ -351,3 +351,91 @@ jobs:
           PYTHON_EXECUTABLE=python ${CONDA_RUN} bash .ci/scripts/test_model.sh "${MODEL_NAME}" "${BUILD_TOOL}" "${BACKEND}"
           echo "::endgroup::"
         done
+
+  test-huggingface-transformers:
+    name: test-huggingface-transformers
+    uses: pytorch/test-infra/.github/workflows/linux_job.yml@main
+    strategy:
+      matrix:
+        hf_model_repo: [google/gemma-2b]
+      fail-fast: false
+    with:
+      secrets-env: HF_TOKEN
+      runner: linux.12xlarge
+      docker-image: executorch-ubuntu-22.04-clang12
+      submodules: 'true'
+      ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      timeout: 90
+      script: |
+        echo "::group::Set up HuggingFace Hub"
+        # The generic Linux job chooses to use base env, not the one setup by the image
+        CONDA_ENV=$(conda env list --json | jq -r ".envs | .[-1]")
+        conda activate "${CONDA_ENV}"
+        pip install -U "huggingface_hub[cli]"
+        HF_AUTH_TOKEN="${SECRET_HF_TOKEN}" huggingface-cli login
+        echo "::endgroup::"
+
+
+        echo "::group::Set up ExecuTorch"
+        PYTHON_EXECUTABLE=python bash .ci/scripts/setup-linux.sh cmake
+
+        echo "Installing libexecutorch.a, libextension_module.so, libportable_ops_lib.a"
+        rm -rf cmake-out
+        cmake \
+            -DCMAKE_INSTALL_PREFIX=cmake-out \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON \
+            -DEXECUTORCH_BUILD_EXTENSION_MODULE=ON \
+            -DEXECUTORCH_BUILD_EXTENSION_TENSOR=ON \
+            -DEXECUTORCH_BUILD_KERNELS_CUSTOM=ON \
+            -DEXECUTORCH_BUILD_KERNELS_OPTIMIZED=ON \
+            -DEXECUTORCH_BUILD_KERNELS_QUANTIZED=ON \
+            -DEXECUTORCH_BUILD_XNNPACK=ON \
+            -DPYTHON_EXECUTABLE=python \
+            -Bcmake-out .
+        cmake --build cmake-out -j9 --target install --config Release
+
+        echo "Build llama runner"
+        dir="examples/models/llama2"
+        cmake \
+            -DCMAKE_INSTALL_PREFIX=cmake-out \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DEXECUTORCH_BUILD_KERNELS_CUSTOM=ON \
+            -DEXECUTORCH_BUILD_KERNELS_OPTIMIZED=ON \
+            -DEXECUTORCH_BUILD_KERNELS_QUANTIZED=ON \
+            -DEXECUTORCH_BUILD_XNNPACK=ON \
+            -DPYTHON_EXECUTABLE=python \
+            -Bcmake-out/${dir} \
+            ${dir}
+        cmake --build cmake-out/${dir} -j9 --config Release
+        echo "::endgroup::"
+
+        echo "::group::Set up HuggingFace Transformers"
+        # TODO(guangyang): Switch to use released transformers library after all required patches are included
+        cd ..
+        git clone --branch main https://github.com/huggingface/transformers.git
+        pushd transformers
+        pip install .
+        popd
+        echo "::endgroup::"
+
+        echo "::group::Export to ExecuTorch"
+        python -m extension.export_util.export_hf_model -hfm=${{ matrix.hf_model_repo }}
+
+        # Transform Hugging Face model repo name to cache dir name
+        TRANSFORMED_MODEL_NAME="models--$(echo "$MODEL_NAME" | sed 's/\//--/g')"
+
+        # Search for tokenizer.model within the transformed model directory
+        TOKENIZER_PATH=$(find "~/.cache/huggingface/hub" -type f -name "tokenizer.model" -path "*/$TRANSFORMED_MODEL_NAME/*" -print -quit)
+        if [ -z "$TOKENIZER_PATH" ]; then
+          echo "tokenizer.model not found for model ${{ matrix.hf_model_repo }}"
+          exit 1
+        else
+          echo "Found tokenizer.model at: $TOKENIZER_PATH"
+          echo "$TOKENIZER_PATH"
+          cp TOKENIZER_PATH ./
+        fi
+        python -m extension.llm.tokenizer.tokenizer -t tokenizer.model -o tokenizer.bin
+
+        cmake-out/examples/models/llama2/llama_main --model_path=gemma.pte --tokenizer_path=tokenizer.bin --prompt="My name is"
+        echo "::endgroup::"
