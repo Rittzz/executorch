@@ -218,12 +218,6 @@ jobs:
       script: |
         set -eux
 
-        # Use Xcode 16 https://github.com/orgs/community/discussions/78049
-        sudo xcode-select --switch /Applications/Xcode_16.1_beta.app
-
-        # DEBUG
-        xcodebuild -project extension/apple/Benchmark/Benchmark.xcodeproj -scheme Benchmark -showdestinations
-
         echo "::group::Setting up CI environment"
         .ci/scripts/setup-conda.sh
 
@@ -249,25 +243,25 @@ jobs:
         echo "::endgroup::"
 
         echo "::group::Build ExecuTorch iOS frameworks"
-        # FRAMEWORKS=(
-        #   "executorch"
-        #   "backend_coreml"
-        #   "backend_mps"
-        #   "backend_xnnpack"
-        #   "kernels_custom"
-        #   "kernels_optimized"
-        #   "kernels_portable"
-        #   "kernels_quantized"
-        # )
+        FRAMEWORKS=(
+          "executorch"
+          "backend_coreml"
+          "backend_mps"
+          "backend_xnnpack"
+          "kernels_custom"
+          "kernels_optimized"
+          "kernels_portable"
+          "kernels_quantized"
+        )
 
-        # # Build Release iOS Frameworks
-        # PYTHON_EXECUTABLE=python ${CONDA_RUN} --no-capture-output \
-        #   build/build_apple_frameworks.sh --coreml --custom --mps --optimized --portable --quantized --xnnpack
+        # Build Release iOS Frameworks
+        PYTHON_EXECUTABLE=python ${CONDA_RUN} --no-capture-output \
+          build/build_apple_frameworks.sh --coreml --custom --mps --optimized --portable --quantized --xnnpack
 
-        # mkdir -p extension/apple/Benchmark/Frameworks
-        # for FRAMEWORK in "${FRAMEWORKS[@]}"; do (
-        #   cp -r "cmake-out/${FRAMEWORK}.xcframework" extension/apple/Benchmark/Frameworks/
-        # ) done
+        mkdir -p extension/apple/Benchmark/Frameworks
+        for FRAMEWORK in "${FRAMEWORKS[@]}"; do (
+          cp -r "cmake-out/${FRAMEWORK}.xcframework" extension/apple/Benchmark/Frameworks/
+        ) done
         echo "::endgroup::"
 
         # NB: Although exported models can be copied to this directory and bundled together with the
