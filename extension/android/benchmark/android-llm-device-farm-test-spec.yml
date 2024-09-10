@@ -80,6 +80,12 @@ phases:
         --es "model_dir" "/data/local/tmp/llama" \
         --es "tokenizer_path" "/data/local/tmp/llama/tokenizer.bin"
 
+      - echo "Run generic benchmark"
+      - |
+        adb -s $DEVICEFARM_DEVICE_UDID shell am start -W -n org.pytorch.minibench/.BenchmarkActivity \
+        --es "model_dir" "/data/local/tmp/llama"
+
+
   post_test:
     commands:
       - echo "Gather LLM benchmark results"
