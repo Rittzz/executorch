@@ -13,7 +13,7 @@ APP_PATH="extension/apple/Benchmark/Benchmark"
 xcodebuild build-for-testing \
   -project "${APP_PATH}.xcodeproj" \
   -scheme Benchmark \
-  -destination 'platform=iOS' \
+  -destination 'platform=iOS,id=dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder,name=Any iOS Device' \
   -sdk iphoneos \
   -allowProvisioningUpdates \
   DEVELOPMENT_TEAM=78E7V7QP35 \
