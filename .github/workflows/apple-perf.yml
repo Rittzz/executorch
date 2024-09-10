@@ -218,8 +218,8 @@ jobs:
       script: |
         set -eux
 
-        # Use Xcode 16 https://github.com/orgs/community/discussions/78049
-        sudo xcode-select --switch /Applications/Xcode_16.1_beta.app/Contents/Developer
+        # Use Xcode 14.3.1 https://github.com/orgs/community/discussions/78049
+        sudo xcode-select --switch /Applications/Xcode_14.3.1.app/Contents/Developer
 
         echo "::group::Setting up CI environment"
         .ci/scripts/setup-conda.sh
