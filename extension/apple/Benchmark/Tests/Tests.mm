@@ -30,7 +30,7 @@ using namespace ::executorch::runtime;
          [NSBundle bundleForClass:[self class]],
        ]) {
     for (NSString *directory in @[
-           @"Models",
+           // @"Models",
            @"aatp/data",
          ]) {
       NSString *directoryPath =

@@ -1,10 +1,11 @@
 name: Upload AWS Device Farm Apple iOS test specs
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/upload-apple-test-specs.yml
-      - examples/demo-apps/apple_ios/default-ios-device-farm-appium-test-spec.yml
+  # DEBUG: TO BE UNCOMMENTED
+  # pull_request:
+  #   paths:
+  #     - .github/workflows/upload-apple-test-specs.yml
+  #     - examples/demo-apps/apple_ios/default-ios-device-farm-appium-test-spec.yml
   push:
     branches:
       - main
