@@ -15,9 +15,12 @@ on:
       - build/build_apple_frameworks.sh
       - build/create_frameworks.sh
       - build/test_ios_ci.sh
-      - examples/demo-apps/apple/**
+      - examples/demo-apps/apple_ios/**
       - extension/apple/**
       - extension/module/**
+    paths-ignore:
+      # Already been covered by the upload test spec workflow
+      - examples/demo-apps/apple_ios/default-ios-device-farm-appium-test-spec.yml
   workflow_dispatch:
   # TODO (huydhn): This is used to validate the test spec. Eventually, we need a proper
   # perf benchmark workflow like android-perf. This can be cleaned up once that workflow
