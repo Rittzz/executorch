@@ -50,6 +50,7 @@ class PreprocessConfig:
     tile_size: int = 224
     max_num_tiles: int = 4
     possible_resolutions = None
+    pad_max_tiles: bool = False
 
 
 class TestImageTransform(unittest.TestCase):
@@ -132,6 +133,17 @@ class TestImageTransform(unittest.TestCase):
                 [1.0, 1.0],  # expected_tile_max
                 [0.0, 0.0],  # expected_tile_min
                 [1, 2],  # expected_aspect_ratio
+                False,  # pad_max_tiles
+            ),
+            (
+                (100, 400, 3),  # image_size
+                torch.Size([4, 3, 224, 224]),  # expected shape
+                False,  # resize_to_max_canvas
+                [0.2230, 0.1763, 0.0, 0.0],  # expected_tile_means
+                [1.0, 1.0, 0.0, 0.0],  # expected_tile_max
+                [0.0, 0.0, 0.0, 0.0],  # expected_tile_min
+                [1, 2],  # expected_aspect_ratio
+                True,  # pad_max_tiles
             ),
             (
                 (1000, 300, 3),  # image_size
@@ -141,6 +153,7 @@ class TestImageTransform(unittest.TestCase):
                 [0.9976, 0.9940, 0.9936, 0.9906],  # expected_tile_max
                 [0.0037, 0.0047, 0.0039, 0.0],  # expected_tile_min
                 [4, 1],  # expected_aspect_ratio
+                False,  # pad_max_tiles
             ),
             (
                 (200, 200, 3),  # image_size
@@ -150,6 +163,7 @@ class TestImageTransform(unittest.TestCase):
                 [0.9921, 0.9925, 0.9969, 0.9908],  # expected_tile_max
                 [0.0056, 0.0069, 0.0059, 0.0032],  # expected_tile_min
                 [2, 2],  # expected_aspect_ratio
+                False,  # pad_max_tiles
             ),
             (
                 (600, 200, 3),  # image_size
@@ -159,6 +173,17 @@ class TestImageTransform(unittest.TestCase):
                 [1.0, 1.0, 1.0],  # expected_tile_max
                 [0.0, 0.0, 0.0],  # expected_tile_min
                 [3, 1],  # expected_aspect_ratio
+                False,  # pad_max_tiles
+            ),
+            (
+                (600, 200, 3),  # image_size
+                torch.Size([4, 3, 224, 224]),  # expected shape
+                False,  # resize_to_max_canvas
+                [0.4472, 0.4468, 0.3031, 0.0],  # expected_tile_means
+                [1.0, 1.0, 1.0, 0.0],  # expected_tile_max
+                [0.0, 0.0, 0.0, 0.0],  # expected_tile_min
+                [3, 1],  # expected_aspect_ratio
+                True,  # pad_max_tiles
             ),
         ]
     )
@@ -171,8 +196,11 @@ class TestImageTransform(unittest.TestCase):
         expected_tile_max: List[float],
         expected_tile_min: List[float],
         expected_ar: List[int],
+        pad_max_tiles: bool,
     ) -> None:
-        config = PreprocessConfig(resize_to_max_canvas=resize_to_max_canvas)
+        config = PreprocessConfig(
+            resize_to_max_canvas=resize_to_max_canvas, pad_max_tiles=pad_max_tiles
+        )
 
         reference_model = CLIPImageTransform(
             image_mean=config.image_mean,
@@ -183,6 +211,7 @@ class TestImageTransform(unittest.TestCase):
             tile_size=config.tile_size,
             max_num_tiles=config.max_num_tiles,
             possible_resolutions=None,
+            pad_max_tiles=config.pad_max_tiles,
         )
 
         eager_model = _CLIPImageTransform(
@@ -192,6 +221,7 @@ class TestImageTransform(unittest.TestCase):
             antialias=config.antialias,
             tile_size=config.tile_size,
             max_num_tiles=config.max_num_tiles,
+            pad_max_tiles=config.pad_max_tiles,
         )
 
         exported_model = export_preprocess(
@@ -201,6 +231,7 @@ class TestImageTransform(unittest.TestCase):
             antialias=config.antialias,
             tile_size=config.tile_size,
             max_num_tiles=config.max_num_tiles,
+            pad_max_tiles=config.pad_max_tiles,
         )
 
         executorch_model = lower_to_executorch_preprocess(exported_model)
@@ -235,8 +266,11 @@ class TestImageTransform(unittest.TestCase):
             self.assertAlmostEqual(tile.min().item(), expected_tile_min[i], delta=1e-4)
 
         # Check num tiles matches the product of the aspect ratio.
-        expected_num_tiles = reference_ar[0] * reference_ar[1]
-        self.assertEqual(expected_num_tiles, reference_image.shape[0])
+        if pad_max_tiles:
+            self.assertEqual(config.max_num_tiles, reference_image.shape[0])
+        else:
+            expected_num_tiles = reference_ar[0] * reference_ar[1]
+            self.assertEqual(expected_num_tiles, reference_image.shape[0])
 
         # Pre-work for eager and exported models. The reference model performs these
         # calculations and passes the result to _CLIPImageTransform, the exportable model.
